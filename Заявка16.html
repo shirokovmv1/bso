@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Заявка на согласование/изменение договорных документов</title>
-    <!-- Библиотека для генерации PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Библиотеки для генерации PDF с поддержкой кириллицы -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; line-height: 1.6; }
@@ -502,56 +503,140 @@
             return html;
         }
 
-        // Генерация PDF документа
+        // Генерация PDF документа с использованием pdfmake (поддержка кириллицы)
         async function generatePdf(fileName) {
-            const htmlContent = createPdfHtml();
+            // Получаем данные формы
+            const requestNumber = document.getElementById('requestNumber').value;
+            const initiator = document.getElementById('initiator').value;
+            const date = formatDateDisplay(document.getElementById('date').value);
+            const requestType = document.getElementById('requestType').value;
+            const docType = document.getElementById('docType').value;
+            const docName = document.getElementById('docName').value;
+            const docContent = document.getElementById('docContent').value;
+            const contractorName = document.getElementById('contractorName').value;
+            const existingContact = document.getElementById('existingContact').value;
+            const existingPhone = document.getElementById('existingPhone').value;
+            const existingEmail = document.getElementById('existingEmail').value;
+            const hasDocuments = document.getElementById('hasDocuments').value;
+            const docDate = formatDateDisplay(document.getElementById('docDate').value);
+            const edoAvailable = document.getElementById('edoAvailable').checked;
+            const edoName = document.getElementById('edoName').value;
+            const docCategory = document.getElementById('docCategory').value;
+            const specialConditions = document.getElementById('specialConditions').value;
             
-            // Создаём контейнер для PDF
-            const container = document.createElement('div');
-            container.id = 'pdf-container';
-            container.innerHTML = htmlContent;
+            // Функция создания поля
+            const field = (label, value) => ({
+                text: [
+                    { text: label + ' ', bold: true },
+                    { text: value || '—' }
+                ],
+                margin: [0, 2, 0, 2]
+            });
             
-            // Стили для корректного отображения
-            container.style.cssText = `
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 794px;
-                background: white;
-                padding: 20px;
-                font-family: Arial, sans-serif;
-                font-size: 12px;
-                line-height: 1.6;
-                color: #000;
-                z-index: 10000;
-            `;
+            // Функция создания заголовка раздела
+            const section = (title) => ({
+                text: title,
+                style: 'sectionHeader',
+                margin: [0, 10, 0, 5]
+            });
             
-            document.body.appendChild(container);
-            
-            // Ждём отрисовки
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const opt = {
-                margin: 10,
-                filename: fileName,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                    scale: 2,
-                    useCORS: true,
-                    logging: true,
-                    backgroundColor: '#ffffff',
-                    width: container.offsetWidth,
-                    height: container.offsetHeight
+            // Содержимое документа
+            const content = [
+                {
+                    text: 'ЗАЯВКА НА СОГЛАСОВАНИЕ/ИЗМЕНЕНИЕ\nДОГОВОРНЫХ ДОКУМЕНТОВ',
+                    style: 'header',
+                    alignment: 'center',
+                    margin: [0, 0, 0, 20]
                 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                field('Номер заявки:', requestNumber),
+                field('Инициатор заявки:', initiator),
+                field('Дата заявки:', date),
+                field('Тип заявки:', requestType),
+                
+                section('ИНФОРМАЦИЯ О ДОКУМЕНТЕ'),
+                field('Вид договорного документа:', docType),
+                field('Наименование документа:', docName),
+                field('Содержание документа:', docContent),
+                
+                section('КОНТРАГЕНТ'),
+                field('Наименование контрагента:', contractorName),
+                field('Контактное лицо:', existingContact),
+                field('Телефон:', existingPhone),
+                field('Email контрагента:', existingEmail),
+                field('Наличие уставных документов:', hasDocuments)
+            ];
+            
+            if (hasDocuments === 'Нет' && docDate) {
+                content.push(field('Дата предоставления документов:', docDate));
+            }
+            
+            content.push(field('Возможность работы с ЭДО:', edoAvailable ? 'Да' : 'Нет'));
+            
+            if (edoAvailable && edoName) {
+                content.push(field('Наименование ЭДО-системы:', edoName));
+            }
+            
+            content.push(field('Тип договорного документа:', docCategory ? 'с ' + docCategory + 'ом' : '—'));
+            
+            // Детали по типу контрагента
+            if (docCategory === 'Подрядчик') {
+                content.push(section('ДЕТАЛИ (ПОДРЯДЧИК)'));
+                content.push(field('Название проекта:', document.getElementById('projectName').value));
+                content.push(field('Адрес объекта:', document.getElementById('objectAddr').value));
+                content.push(field('Вид работ:', document.getElementById('workType').value));
+                content.push(field('Стоимость работ:', document.getElementById('workCost').value));
+                content.push(field('Наличие давальческого материала:', document.getElementById('material').value));
+                content.push(field('Сумма авансового платежа:', document.getElementById('advance').value));
+                content.push(field('Разбивка платежей:', document.getElementById('paymentSchedule').value));
+                content.push(field('Гарантийные удержания:', document.getElementById('guarantee').value));
+                content.push(field('Дата начала работ:', formatDateDisplay(document.getElementById('startDate').value)));
+                content.push(field('Дата окончания работ:', formatDateDisplay(document.getElementById('endDate').value)));
+                content.push(field('Ключевые изменения:', document.getElementById('keyChanges').value));
+            } else if (docCategory === 'Поставщик') {
+                content.push(section('ДЕТАЛИ (ПОСТАВЩИК)'));
+                content.push(field('Название проекта:', document.getElementById('supplierProject').value));
+                content.push(field('Адрес объекта:', document.getElementById('supplierAddr').value));
+                content.push(field('Номенклатура поставки:', document.getElementById('nomenclature').value));
+                content.push(field('Сумма поставки:', document.getElementById('supplyCost').value));
+                content.push(field('Ключевые изменения:', document.getElementById('supplierChanges').value));
+            } else if (docCategory === 'Заказчик') {
+                content.push(section('ДЕТАЛИ (ЗАКАЗЧИК)'));
+                content.push(field('Название проекта:', document.getElementById('customerProject').value));
+                content.push(field('Адрес объекта:', document.getElementById('customerAddr').value));
+                content.push(field('Ключевые изменения:', document.getElementById('customerChanges').value));
+            }
+            
+            if (specialConditions) {
+                content.push(section('ОСОБЫЕ УСЛОВИЯ'));
+                content.push({ text: specialConditions, margin: [0, 2, 0, 2] });
+            }
+            
+            // Определение документа
+            const docDefinition = {
+                content: content,
+                defaultStyle: {
+                    font: 'Roboto',
+                    fontSize: 10
+                },
+                styles: {
+                    header: {
+                        fontSize: 14,
+                        bold: true,
+                        color: '#1f3c88'
+                    },
+                    sectionHeader: {
+                        fontSize: 11,
+                        bold: true,
+                        color: '#1f3c88',
+                        decoration: 'underline'
+                    }
+                },
+                pageSize: 'A4',
+                pageMargins: [40, 40, 40, 40]
             };
             
-            try {
-                await html2pdf().set(opt).from(container).save();
-            } finally {
-                // Удаляем контейнер после генерации
-                document.body.removeChild(container);
-            }
+            // Создаём и скачиваем PDF
+            pdfMake.createPdf(docDefinition).download(fileName);
         }
 
         // Показать модальное окно
